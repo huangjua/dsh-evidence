@@ -1,128 +1,125 @@
-# @dsh-external/dsh-evidence
+<div align="center">
 
-> **一句话**：给 DSH 加一层可复核、防篡改、有有效期的审计证据包——把命令输出、文件哈希、JSON 结果、验证脚本沉淀成"可验证不可抵赖"的快照。
+# 🛡️ dsh-evidence
 
-AI 的执行结果默认无法复核、无法证明"当时就是这样"。本插件借鉴 Codex `audit-evidence` 模式，用 **SHA256 清单 + 追加式哈希链收据 + 有效期** 把审计证据固化下来。
+**Verifiable, tamper-proof audit evidence bundles for DSH agent execution**  
+*SHA256 Manifests • Append-Only Hash-Chain Receipts • Temporal Validity (`validUntil`) • Zero Fluff*
 
-## 核心亮点
+[![DSH Suite](https://img.shields.io/badge/DSH_Power_Suite-Evidence_Audit-yellow?style=flat-square)](https://github.com/huangjua)
+[![Integrity](https://img.shields.io/badge/Integrity-SHA256_Hash_Chain-red?style=flat-square)](#)
+[![License](https://img.shields.io/badge/License-BSD--3--Clause-orange?style=flat-square)](LICENSE)
 
-- **哈希链收据**：每条 create/add 追加一条链式记录，打开即全链校验，损坏拒绝续写。
-- **manifestHash 自完整性**：`evidence.json` 被手工篡改会被验出。
-- **有效期 `validUntil`**：证据会"过期"，stale/expired 显式分类。
-- **诚实能力声明**：明确写出"能证明什么 / 不能证明什么"——哈希不是加密、不是签名。
+[Features](#-key-features) • [Quick Start](#-quick-start) • [DSH Power Suite](#-dsh-power-suite) • [Tools](#-available-tools) • [简体中文](README_zh.md)
 
-## 优点与权衡
-
-| 👍 优点 | ⚠️ 权衡 / 边界 |
-|---|---|
-| 最简单、职责单一，最不易出 bug | 功能面窄：不自动采集，全靠模型主动调用 |
-| 防篡改 + 防过期 + 链清单一致性校验 | `verify` 全量重算哈希，大包慢 |
-| 诚实声明能/不能证明什么 | 哈希不是签名，防篡改但防不了"整体伪造" |
-
-## 借鉴的优秀项目
-
-| 项目 | 借鉴了什么 |
-|---|---|
-| openai/codex | 目录式证据包 + 清单 + 可复核快照 |
-| 030611/qiushi-dsh-evidence-audit（MIT，直接移植） | canonical JSON、追加式哈希链收据、0700/0600 权限、诚实能力声明 |
-| QoderAI/better-harness | evidence-bounded claims、missing/stale evidence 显式化 |
-| m0n0x41d/haft | 证据有效期（validUntil）与过期分类 |
+</div>
 
 ---
 
-证据包 / 审计证据 toolkit。借鉴 Codex `audit-evidence` 模式，让 DSH 能把"命令输出、文件 hash、JSON 结果、验证脚本"沉淀成可复核、防篡改、有有效期的证据包。
+### 💡 Why dsh-evidence?
 
-## 借鉴来源（调研结论）
+AI agents often hallucinate "tests passed" or succeed on commands that silently produce bad outputs. When delivering code or auditing tasks, there is no way to prove *what really ran* and *whether outputs were modified afterwards*.
 
-| 项目 | Star | 借鉴了什么 |
+**`dsh-evidence` provides cryptographic proof of agent task execution:**
+- ⛓️ **Append-Only Hash-Chained Receipts**: Every snapshot or execution link appends a cryptographic hash to `receipt.jsonl`. Any post-hoc file modification immediately fails verification.
+- 📦 **Self-Contained Snapshots (`copy=true`)**: Bundle output directories, generated binaries, and validation scripts into portable, verifiable tarballs.
+- ⏱️ **Temporal Validity (`validUntil`)**: Explicitly tracks when evidence becomes `stale` (touched) or `expired`, preventing outdated logs from justifying new claims.
+- 🤝 **Honest Boundary Declarations**: Clear definitions of what cryptographic hashing can and cannot prove.
+
+---
+
+## 🚀 Quick Start
+
+### Installation
+
+```bash
+# In your DSH plugin environment
+dev_inject_plugin @dsh-external/dsh-evidence
+```
+
+### Typical Usage Flow
+
+1. **Create evidence bundle**: `evidence_create name="bench-2026" description="Performance audit"`
+2. **Add snapshots & assertions**: `evidence_add name="bench-2026" paths="bench.json|verify.py" claim="30% speedup verified" validUntil=2026-12-31`
+3. **Audit and verify**: `evidence_verify name="bench-2026"`
+
+---
+
+## 🧩 DSH Power Suite
+
+This plugin is part of the **DSH Agent Power Suite** — 4 modular, zero-hard-dependency plugins forming a complete closed-loop developer workflow:
+
+```mermaid
+graph LR
+    M["🧠 <b>dsh-local-memory</b><br/><i>1. Remember rules & prefs</i>"] 
+    --> E["⚡ <b>dsh-context-economy</b><br/><i>2. Save 80%+ tokens reading code</i>"]
+    --> A["🛡️ <b>dsh-evidence</b><br/><i>3. Tamper-proof audit receipts</i>"]
+    --> S["🔍 <b>dsh-session-index</b><br/><i>4. CJK search & bookmarks</i>"]
+    --> M
+
+    style M fill:#e8f4fd,stroke:#2b7de9,stroke-width:2px;
+    style E fill:#eef9f2,stroke:#1e8e3e,stroke-width:2px;
+    style A fill:#fef7e0,stroke:#f29900,stroke-width:2px;
+    style S fill:#f3e8fd,stroke:#8430ce,stroke-width:2px;
+```
+
+| Plugin | Role in Suite | Synergy with Evidence |
 |---|---|---|
-| [openai/codex](https://github.com/openai/codex) | 118k | 起源：目录式证据包 + 清单 + 可复核快照；会话级审计轨迹的思路 |
-| [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) | 12.9k | DSH 生态规范：peerDependencies 预发布版本范围必须带显式 prerelease 分支（`>=0.0.1-rc <2` 会静默排除 0.1.0-rc.x，已修复） |
-| [QoderAI/better-harness](https://github.com/QoderAI/better-harness) | 1.9k | evidence-bounded claims（每条快照声明其支撑的结论）；missing/stale evidence 显式化，绝不默默变成分数 |
-| [m0n0x41d/haft](https://github.com/m0n0x41d/haft) | 1.4k | 证据有效期（validUntil）与过期分类，证据会“过期” |
-| [030611/qiushi-dsh-evidence-audit](https://github.com/030611/qiushi-dsh-evidence-audit) | 同类最强 | **直接移植（MIT）**：canonical JSON（递归键排序 + 严格校验）、追加式哈希链收据（打开即全链校验、损坏拒绝续写）、0700/0600 权限、诚实能力声明 |
-| [030611/dsh-verification-receipt](https://github.com/030611/dsh-verification-receipt) | 同类 | 被动 bundle 监听事件自动写收据 —— **评估后未采用**（与 DSH 自带会话存储重复、性能/隐私成本大于收益，见下） |
+| 🛡️ **[dsh-evidence](https://github.com/huangjua/dsh-evidence)** | **Audit & Receipts** (Current) | Creates cryptographic audit bundles and hash-chained receipts for agent execution. |
+| 🧠 **[dsh-local-memory](https://github.com/huangjua/dsh-local-memory)** | **Memory Layer** | Commits critical decisions into memory only after validating evidence receipts. |
+| ⚡ **[dsh-context-economy](https://github.com/huangjua/dsh-context-economy)** | **Context Economy** | Benchmarks (e.g. `savings-bench`) register evidence snapshots to prove real token savings. |
+| 🔍 **[dsh-session-index](https://github.com/huangjua/dsh-session-index)** | **Session Search** | Search past session archives to pinpoint historical evidence receipts and jump back. |
 
-**评估后不采用的：** verification-receipt 的“每 turn 自动收据”会把 prompts/工具参数放进收据文件，与 DSH 自身 session 存储重复且引入持续写盘；dsh-market 的 `dsh.plugin.json` 市场元数据对本地私有插件无收益。两者坏处大于好处，故只取思路不取实现。
+---
 
-## 能力
+## 📖 Deep Dive & Reference
 
-| 工具 | 作用 |
+<details>
+<summary><b>🛠️ Available Tools (5 Tools)</b></summary>
+
+| Tool | Purpose |
 |---|---|
-| `evidence_create` | 创建证据包目录、`evidence.json`（v2 自完整性哈希）与 `receipt.jsonl` 哈希链收据 |
-| `evidence_add` | 添加文件/目录快照（SHA256/size/mtime），可选 `claim`（证据结论）、`validUntil`（有效期）、`copy`（复制进包内自包含） |
-| `evidence_verify` | 重算哈希，报告 missing / corrupt / **stale**（内容没变但被碰过）/ **expired**（过有效期），并校验清单完整性 + 收据链；**收据链内部合法但绑定旧清单（consistentWithManifest=false）同样判 FAIL** |
-| `evidence_list` | 列出所有证据包（含过期计数） |
-| `evidence_show` | 查看完整清单（含 claim / validUntil / source / manifestHash） |
+| `evidence_create` | Initialize evidence directory, `evidence.json` (v2), and `receipt.jsonl` chain. |
+| `evidence_add` | Add files/directories (SHA256, size, mtime) with optional `claim`, `validUntil`, and `copy=true`. |
+| `evidence_verify` | Recalculate SHA256 hashes, verify chain consistency, and audit against expiration/stale status. |
+| `evidence_list` | List all local evidence packages with summary health counts. |
+| `evidence_show` | Inspect complete manifest, claim assertions, timestamps, and receipt chains. |
 
-## 使用方式
+</details>
+
+<details>
+<summary><b>📁 Bundle Structure & Manifest Format</b></summary>
 
 ```text
-evidence_create name=jhora-audit-20260816 description="JHora 数据提取审计"
-evidence_add name=jhora-audit-20260816 paths="<result.json>|<verify.py>" note="A0 结果" claim="A0 任务成功执行且输出符合预期" validUntil=2026-12-31
-evidence_add name=jhora-audit-20260816 paths="<output-directory>" copy=true   # 复制进包内，证据包可整体迁移
-evidence_verify name=jhora-audit-20260816
-evidence_list
-evidence_show name=jhora-audit-20260816
-```
-
-## 证据包结构
-
-```
 ~/.dsh/evidence/<name>/
-  evidence.json     # 清单（v2：manifestHash 自完整性）
-  receipt.jsonl     # 追加式哈希链收据（每条 create/add 记录，防篡改）
-  files/            # copy=true 时的自包含副本
+  evidence.json     # Manifest with top-level manifestHash self-integrity
+  receipt.jsonl     # Append-only hash-chained receipts
+  files/            # Self-contained copies when copy=true
 ```
 
-`evidence.json` 内容：
+</details>
 
-```json
-{
-  "version": 2,
-  "id": "<name>",
-  "createdAt": 0,
-  "updatedAt": 0,
-  "description": "",
-  "metadata": {},
-  "files": {
-    "<result.json>": {
-      "sha256": "UPPERCASE_HEX",
-      "size": 123,
-      "mtimeMs": 0,
-      "claim": "A0 任务成功执行",
-      "validUntil": 1798675200000
-    }
-  },
-  "manifestHash": "UPPERCASE_HEX"
-}
-```
+<details>
+<summary><b>⚖️ Honest Capability Declarations</b></summary>
 
-## 能证明什么 / 不能证明什么（诚实声明）
+- **Can Prove**: Snapshot content matching, file alteration (corrupt/stale), manual edits to `evidence.json`, and receipt sequence tampering.
+- **Cannot Prove**: Command intention authenticity, author identity, or file system root access tampering (hashes are not digital signatures).
 
-- **能证明**：快照时文件内容是什么；快照后文件是否被改动（corrupt）或被动过（stale）；`evidence.json` 是否被手工篡改（manifestHash）；`receipt.jsonl` 操作轨迹是否被增删改（哈希链）；**清单与收据链是否绑定同一版本**（receipt 存在时必须 `valid` 且 `consistentWithManifest`，链合法但绑旧清单判 FAIL）。
-- **不能证明**：文件内容本身是真实的、命令确实成功执行、谁创建了文件、完整后缀是否被删除。哈希不是加密，不是签名，也不是外部信任锚。
+</details>
 
-## 构建（开发/安装分离）
+<details>
+<summary><b>🧪 Building & Testing</b></summary>
 
 ```bash
-node scripts/build.mjs                 # 编译 src → lib
+node scripts/build.mjs                 # Compile src ➡️ lib
 npm run typecheck
-npm test                                # 完整性测试矩阵（依赖先 build）
-npm run pack:check                      # 发布包内容与解包导入检查
+npm test                                # Run test suite
+npm run pack:check                      # Packaging check
 ```
 
-发布包只保留部署产物：`lib/`、`package.json`、`README.md` 与运行时解析依赖。
+</details>
 
-## 注入 / 装配
+---
 
-```bash
-dev_inject_plugin  <plugin-directory>
-dev_install_package <plugin-directory> --profile web
-```
-
-## 已知限制
-
-- 哈希为流式计算（SHA256），不再一次性读入内存；verify 全量重算耗时随证据包大小线性增长。
-- `copy=true` 会复制文件内容进证据包（磁盘占用随之增长）；不复制时记录外部路径，外部文件被删除后 verify 会报 missing。
-- v1 旧格式证据包仍可读取，下次 add 时自动升级为 v2。
+<div align="center">
+<sub>Part of the <a href="https://github.com/huangjua">DSH Agent Power Suite</a>. Licensed under BSD-3-Clause.</sub>
+</div>

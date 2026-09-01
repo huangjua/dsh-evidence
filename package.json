@@ -1,7 +1,7 @@
 {
   "name": "@dsh-external/dsh-evidence",
   "version": "0.1.0",
-  "description": "Evidence/audit bundle toolkit: create, snapshot, verify SHA256 manifests + hash-chained receipts",
+  "description": "Verifiable, tamper-proof audit evidence bundles and hash-chained receipts for DSH agent execution",
   "private": true,
   "type": "module",
   "main": "./lib/index.js",
